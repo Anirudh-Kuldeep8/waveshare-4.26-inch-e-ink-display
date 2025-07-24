@@ -21,12 +21,13 @@ from waveshare_epd import epd4in26
 TEXT_1 = "ThinkRobotics"
 TEXT_2 = "this is where you begin"
 DELAY_SECONDS = 3
+LOGO_FILE = 'logo.bmp' # <<< YOUR LOGO FILENAME HERE
 
 # Setup basic logging
 logging.basicConfig(level=logging.DEBUG)
 
 try:
-    logging.info("Starting E-Ink Text Looper")
+    logging.info("Starting E-Ink Logo and Text Looper")
     
     # Initialize the e-paper display
     epd = epd4in26.EPD()
@@ -36,66 +37,73 @@ try:
     epd.Clear()
     logging.info("Initialization and initial clear complete.")
 
-    # Load fonts
+    # Load fonts (sizes increased)
     # Make sure 'Font.ttc' is present in your 'pic' directory
-    font_large = ImageFont.truetype(os.path.join(picdir, 'Font.ttc'), 40)
-    font_medium = ImageFont.truetype(os.path.join(picdir, 'Font.ttc'), 28)
+    font_large = ImageFont.truetype(os.path.join(picdir, 'Font.ttc'), 50)
+    font_medium = ImageFont.truetype(os.path.join(picdir, 'Font.ttc'), 35)
+
+    # --- Load the logo ---
+    logo_path = os.path.join(picdir, LOGO_FILE)
+    if not os.path.exists(logo_path):
+        logging.error(f"Logo file not found at {logo_path}. Please ensure it exists.")
+        # Create a dummy empty image if logo is not found, so the script can run.
+        logo_image = Image.new('1', (1, 1), 255) 
+    else:
+        logging.info(f"Loading logo from {logo_path}")
+        logo_image = Image.open(logo_path)
 
     # --- Main Loop ---
     while True:
         # --- Display First Text: "ThinkRobotics" ---
-        logging.info(f"Displaying: '{TEXT_1}'")
+        logging.info(f"Displaying: '{TEXT_1}' with logo")
         
         # A full init and clear is recommended before each full refresh to prevent ghosting
         epd.init()
-        epd.Clear()
+        # epd.Clear() # The new image overwrites the whole screen, so clear is optional here
         
         # Create a new blank image in horizontal mode
-        # '1' for 1-bit monochrome, 255 for white background
         h_image = Image.new('1', (epd.width, epd.height), 255)
         draw = ImageDraw.Draw(h_image)
         
-        # Calculate text position to center it
+        # --- Paste Logo ---
+        logo_x = (epd.width - logo_image.width) // 2
+        logo_y = 20 # Padding from the top
+        h_image.paste(logo_image, (logo_x, logo_y))
+        
+        # --- Draw Text ---
+        # Calculate text position to center it below the logo
         bbox = draw.textbbox((0, 0), TEXT_1, font=font_large)
         text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        x_pos = (epd.width - text_width) // 2
-        y_pos = (epd.height - text_height) // 2
+        text_x = (epd.width - text_width) // 2
+        text_y = logo_y + logo_image.height + 20 # Position text below logo with padding
         
-        # Draw the text
-        draw.text((x_pos, y_pos), TEXT_1, font=font_large, fill=0)
+        draw.text((text_x, text_y), TEXT_1, font=font_large, fill=0)
         
         # Send the image to the display
         epd.display(epd.getbuffer(h_image))
-        
-        # Wait for the specified delay
         time.sleep(DELAY_SECONDS)
 
         # --- Display Second Text: "this is where you begin" ---
-        logging.info(f"Displaying: '{TEXT_2}'")
+        logging.info(f"Displaying: '{TEXT_2}' with logo")
         
-        # Re-initialize and clear for the next refresh
         epd.init()
-        epd.Clear()
-        
-        # Create a new blank image
+        # epd.Clear()
+
         h_image = Image.new('1', (epd.width, epd.height), 255)
         draw = ImageDraw.Draw(h_image)
-        
-        # Calculate text position to center it
+
+        # --- Paste Logo ---
+        h_image.paste(logo_image, (logo_x, logo_y))
+
+        # --- Draw Text ---
         bbox = draw.textbbox((0, 0), TEXT_2, font=font_medium)
         text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        x_pos = (epd.width - text_width) // 2
-        y_pos = (epd.height - text_height) // 2
+        text_x = (epd.width - text_width) // 2
+        text_y = logo_y + logo_image.height + 20
+
+        draw.text((text_x, text_y), TEXT_2, font=font_medium, fill=0)
         
-        # Draw the text
-        draw.text((x_pos, y_pos), TEXT_2, font=font_medium, fill=0)
-        
-        # Send the image to the display
         epd.display(epd.getbuffer(h_image))
-        
-        # Wait for the specified delay
         time.sleep(DELAY_SECONDS)
 
 except KeyboardInterrupt:    
@@ -105,7 +113,6 @@ except KeyboardInterrupt:
     epd.Clear()
     logging.info("Putting display to sleep.")
     epd.sleep()
-    # Safely exit the script
     epd4in26.epdconfig.module_exit(cleanup=True)
     exit()
     
